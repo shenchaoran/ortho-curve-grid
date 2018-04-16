@@ -28,7 +28,9 @@ GridCtrl.mesh = (matrixX, matrixY) => {
                 fs.writeFileAsync(path.join(__dirname, '../matlab/my.csv'), strY)
             ])
             .then(rsts => {
-                var cmd = path.join(__dirname, '../matlab/ortho_curve_grid_main.exe');
+                var exePath = path.join('ortho_curve_grid_main');
+                var cmd = 'matlab -nosplash -nodesktop -r ' + exePath;
+                // var cmd = path.join(__dirname, '../matlab/ortho_curve_grid_main.exe');
                 child_process.exec(cmd, {
                     cwd: path.join(__dirname, '../matlab')
                 }, (err, stdout, stderr) => {
