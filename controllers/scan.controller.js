@@ -7,8 +7,9 @@ var ScanCtrl = {};
 module.exports = ScanCtrl;
 
 ScanCtrl.scan = () => {
+	var STEP = 500;
+	var TIMEOUT = 10000;
     return new Promise((resolve, reject) => {
-        var timeOut = 10000;
         var count = 0;
         var interval = setInterval(() => {
             ScanCtrl.scanOnce()
@@ -19,12 +20,12 @@ ScanCtrl.scan = () => {
                         clearInterval(interval);
                         return resolve(true);
                     } else {
-                        if (timeOut < count * 2000) {
+                        if (TIMEOUT < count * STEP) {
                             return reject(false);
                         }
                     }
                 });
-        }, 2000);
+        }, STEP);
     });
 }
 
