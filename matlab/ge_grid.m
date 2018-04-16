@@ -18,7 +18,7 @@ function [ X, Y ] = ge_grid( mx, my )
     
     X = rot90(X, 1);
     Y = rot90(Y, 1);
-    saveMatrix('matlab/mx_result.csv', X);
-    saveMatrix('matlab/my_result.csv', Y);
+    saveMatrix('mx_result.csv', X);
+    saveMatrix('my_result.csv', Y);
 end
 

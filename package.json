@@ -3,7 +3,7 @@
     "version": "0.0.0",
     "private": true,
     "scripts": {
-        "start": "set PORT=7777 && nodemon --inspect=0.0.0.0:65533 bin/www"
+        "start": "set PORT=7777 && nodemon --inspect=0.0.0.0:65535 bin/www"
     },
     "dependencies": {
         "bluebird": "^3.5.1",
