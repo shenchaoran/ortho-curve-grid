@@ -1,0 +1,121 @@
+html,
+body,
+#map-container {
+    height: 100%;
+    width: 100%;
+    margin: 0 !important;
+}
+
+#map-container {
+    overflow: hidden;
+}
+
+.pull-right-bar {
+    top: .5em !important;
+    right: .5em !important;
+    left: auto !important;
+}
+
+.pull-left-bar>.sub-bar:not(:last-child),
+.pull-right-bar>.sub-bar:not(:last-child) {
+    margin-right: 20px !important;
+}
+
+.pull-left-bar {
+    top: .5em !important;
+    left: 2.5em !important;
+    right: auto !important;
+}
+
+.ol-zoom button {
+    display: inline-block !important;
+}
+
+.ol-bookmark {
+    left: 4em !important;
+}
+
+
+/* Layer Switcher */
+
+.toggleVisibility {
+    padding-left: 1.6em;
+    cursor: pointer;
+    border-bottom: 2px solid #369;
+    margin-bottom: 0.5em;
+}
+
+.toggleVisibility:before {
+    background-color: #fff;
+    border: 2px solid #369;
+    box-sizing: border-box;
+    content: "";
+    display: block;
+    height: 1.2em;
+    left: 0.1em;
+    margin: 0;
+    position: absolute;
+    width: 1.2em;
+}
+
+.toggleVisibility.show:before {
+    background: #369;
+}
+
+.hideOpacity .layerswitcher-opacity {
+    display: none;
+}
+
+.hideOpacity .ol-layerswitcher .layerup {
+    height: 1.5em;
+}
+
+.layerswitcher-opacity-label {
+    display: block !important;
+}
+
+.ol-header>div {
+    width: 100%;
+}
+
+
+/* MENU */
+
+.ol-overlay.menu {
+    width: 30%;
+    background: #fff;
+    color: #333;
+    box-shadow: 0px 0px 5px #000;
+    padding: 0.5em;
+    -webkit-transition: all 0.25s;
+    transition: all 0.25s;
+}
+
+.ol-overlay.menu .ol-closebox {
+    color: #369;
+    /* left: 1em;
+    top: 0.5em; */
+}
+
+.ol-overlay.menu .ol-closebox:before {
+    content: "\f0c9";
+    font-family: FontAwesome;
+}
+
+#menu {
+    padding-top: 1.5em;
+    font-size: 0.9em;
+}
+
+.ol-control.menu {
+    /* top: 0.5em;
+    left: 0.5em; */
+}
+
+.ol-control.menu i {
+    color: #fff;
+}
+
+.ol-overlay img {
+    max-width: 90%;
+}

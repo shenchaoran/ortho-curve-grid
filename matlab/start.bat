@@ -1,0 +1,1 @@
+start matlab -nosplash -nodesktop -r main

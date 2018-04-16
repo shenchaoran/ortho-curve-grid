@@ -1,11 +1,34 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title><%= title %></title>
-    <link rel='stylesheet' href='/stylesheets/style.css' />
-  </head>
-  <body>
-    <h1><%= title %></h1>
-    <p>Welcome to <%= title %></p>
-  </body>
+
+<head>
+    <title>Orthogonal grid</title>
+
+    <link rel='stylesheet' href='/src/css/style.css' />
+    <!-- FontAwesome -->
+    <link rel='stylesheet' href='/css/font-awesome/css/font-awesome.min.css' />
+    <link rel="stylesheet" href="/css/ol.css" />
+    <link rel="stylesheet" href="/css/ol3-ext.min.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.9/css/all.css" integrity="sha384-5SOiIsAziJl6AWe0HWRKTXlfcSHKmYV4RBF18PPJ173Kzn7jzMyFuTtk8JA7QQG1" crossorigin="anonymous">
+
+    <!-- jQuery -->
+    <script type="text/javascript" src="/js/jquery-1.11.0.min.js"></script>
+    <!-- ol -->
+    <script type="text/javascript" src="/js/ol-3.17.js"></script>
+    <script type="text/javascript" src="/js/ol3-ext.min.js"></script>
+    <!-- 3th party -->
+    <script src='/js/lodash.js'></script>
+    <script src='/js/turf.min.js'></script>
+    <script src='/js/jquery.gritter.min.js'></script>
+</head>
+
+<body>
+    <div id='map-container'></div>
+</body>
+
+
+<script type='text/javascript' src='/src/js/map.js'></script>
+<script type='text/javascript' src='/src/js/grid.js'></script>
+<script type='text/javascript' src='/src/js/index.js'></script>
+
 </html>
