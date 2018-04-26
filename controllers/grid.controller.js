@@ -31,9 +31,10 @@ GridCtrl.mesh = (matrixX, matrixY) => {
                 var exePath = path.join('ortho_curve_grid_main');
                 var cmd = 'matlab -nosplash -nodesktop -r ' + exePath;
                 // var cmd = path.join(__dirname, '../matlab/ortho_curve_grid_main.exe');
-                child_process.exec(cmd, {
-                    cwd: path.join(__dirname, '../matlab')
-                }, (err, stdout, stderr) => {
+                // child_process.exec(cmd, {
+                //     cwd: path.join(__dirname, '../matlab')
+                // }, (err, stdout, stderr) => {
+                child_process.exec(cmd, (err, stdout, stderr) => {
                     if (err) {
                         console.log(err);
                         return reject(err)
@@ -82,5 +83,5 @@ GridCtrl.mesh = (matrixX, matrixY) => {
                 console.log(error);
                 reject(error);
             });
-    })
+    });
 }
