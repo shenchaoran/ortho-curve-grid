@@ -10,7 +10,6 @@ var Y_NUM = 20;
 
 var Map = () => {};
 
-
 Map.createMap = () => {
     var vectorLayer = new ol.layer.Vector({
         title: 'Draw layer',
@@ -132,7 +131,7 @@ Map.addEditbar = () => {
     let inter = new ol.interaction.Draw({
         type: 'Polygon',
         source: Map.vectorLayer.getSource(),
-        geometryFunction: function(coordinates, geometry) {
+        geometryFunction: function (coordinates, geometry) {
             this.nbpts = coordinates[0].length;
             if (geometry) geometry.setCoordinates([coordinates[0].concat([coordinates[0][0]])]);
             else geometry = new ol.geom.Polygon(coordinates);
@@ -761,31 +760,51 @@ meshRegularGrid = () => {
     if (features.length >= 2) {
         var coorsTop = features[0].getGeometry().getCoordinates();
         var coorsBottom = features[1].getGeometry().getCoordinates();
-        var splitedTop = splitLineString(features[0].getGeometry(), X_NUM);
-        var splitedBottom = splitLineString(features[1].getGeometry(), X_NUM);
+        var splitedTopCoors = splitLineString(features[0].getGeometry(), X_NUM);
+        var splitedBottomCoors = splitLineString(features[1].getGeometry(), X_NUM);
 
-        let mxL = _.min([splitedTop.length, splitedBottom.length]);
+        let mxL = _.min([splitedTopCoors.length, splitedBottomCoors.length]) - 1;
         var matrix = new Array(Y_NUM + 1);
         _.map(matrix, (row, i) => {
             matrix[i] = new Array(mxL);
             _.fill(matrix[i], ['0', '0']);
         });
-        matrix[0] = _.slice(splitedTop, 0, mxL);
-        matrix[Y_NUM] = _.slice(splitedBottom, 0, mxL);
+        matrix[0] = _.slice(splitedTopCoors, 0, mxL);
+        matrix[Y_NUM] = _.slice(splitedBottomCoors, 0, mxL);
 
-        var dirtXl = (matrix[Y_NUM][0][0] - matrix[0][0][0]) / Y_NUM;
-        var dirtYl = (matrix[Y_NUM][0][1] - matrix[0][0][1]) / Y_NUM;
-        var dirtXr = (matrix[Y_NUM][mxL - 1][0] - matrix[0][mxL - 1][0]) / Y_NUM;
-        var dirtYr = (matrix[Y_NUM][mxL - 1][1] - matrix[0][mxL - 1][1]) / Y_NUM;
-        for (let i = 1; i < Y_NUM + 1; i++) {
-            matrix[i][0] = [matrix[0][0][0] + dirtXl * i, matrix[0][0][1] + dirtYl * i];
-            matrix[i][mxL - 1] = [matrix[0][mxL - 1][0] + dirtXr * i, matrix[0][mxL - 1][1] + dirtYr * i];
-        }
+        // var dirtXl = (matrix[Y_NUM][0][0] - matrix[0][0][0]) / Y_NUM;
+        // var dirtYl = (matrix[Y_NUM][0][1] - matrix[0][0][1]) / Y_NUM;
+        // var dirtXr = (matrix[Y_NUM][mxL - 1][0] - matrix[0][mxL - 1][0]) / Y_NUM;
+        // var dirtYr = (matrix[Y_NUM][mxL - 1][1] - matrix[0][mxL - 1][1]) / Y_NUM;
+        // for (let i = 1; i < Y_NUM + 1; i++) {
+        //     matrix[i][0] = [matrix[0][0][0] + dirtXl * i, matrix[0][0][1] + dirtYl * i];
+        //     matrix[i][mxL - 1] = [matrix[0][mxL - 1][0] + dirtXr * i, matrix[0][mxL - 1][1] + dirtYr * i];
+        // }
 
 
         var m = matrix.length;
         var n = matrix[0].length;
-        getRegularGridInnerPts(matrix, 0, m - 1);
+        getRegularGridInnerPts(matrix, 0, matrix.length - 1);
+
+        if (features.length === 4) {
+            let innerTopGeometry = features[2].getGeometry();
+            let innerBottomGeometry = features[3].getGeometry();
+            let innerTopCoors = innerTopGeometry.getCoordinates();
+            let innerBottomCoors = innerBottomGeometry.getCoordinates();
+            let ptIntersect = _.intersectionWith(innerTopCoors, innerBottomCoors, _.isEqual);
+            if (ptIntersect.length) {
+                ptIntersect = ptIntersect[0];
+                let loc = getNearistPt(matrix, ptIntersect);
+                let splitedInnerTopCoors = splitLineString(innerTopGeometry, X_NUM - loc.col);
+                let splitedInnerBottomCoors = splitLineString(innerBottomGeometry, X_NUM - loc.col);
+                divideMatrix(matrix, loc, splitedInnerTopCoors, splitedInnerBottomCoors);
+            } else {
+                alert('分叉口必须有交点！');
+            }
+        } else {
+            ortholize(matrix, 0, matrix.length - 1);
+            drawRegularGrid(matrix, 0, matrix.length - 1);
+        }
 
         var matrixX = [];
         var matrixY = [];
@@ -799,6 +818,7 @@ meshRegularGrid = () => {
         });
 
         var innerPts = getIntersectPts(matrixX, matrixY);
+
         let newStyle = _.concat(
             Map.gridLayer.getStyle(),
             new ol.style.Style({
@@ -813,32 +833,7 @@ meshRegularGrid = () => {
                 geometry: new ol.geom.MultiPoint(innerPts)
             }),
         );
-
-
-        if(features.length === 4) {
-            let innerTop = features[2].getGeometry();
-            let innerBottom = features[3].getGeometry();
-            let ptIntersect = _.intersectionWith(innerTop.getCoordinates(), innerBottom.getCoordinates(), _.isEqual);
-            if(ptIntersect.length) {
-                ptIntersect = ptIntersect[0];let loc = getNearistPt(matrix, ptIntersect);
-                let splitedInnerTop = splitLineString(innerTop, X_NUM - loc.col);
-                let splitedInnerBottom = splitLineString(innerBottom, X_NUM - loc.col);
-                console.log(matrix.length, matrix[0].length)
-                divideMatrix(matrix, loc, splitedInnerTop, splitedInnerBottom);
-                console.log(matrix.length, matrix[0].length)
-                var m = matrix.length;
-                drawRegularGrid(matrix, 0, loc.row);
-                drawRegularGrid(matrix, loc.row + 1, m - 1);
-            }
-            else {
-                alert('分叉口必须有交点！');
-            }
-        }
-        else {
-            drawRegularGrid(matrix);
-        }
-
-        // Map.gridLayer.setStyle(newStyle);
+        Map.gridLayer.setStyle(newStyle);
 
         // addModify
         var layer = Map.gridLayer;
@@ -933,16 +928,19 @@ getNearistPt = (matrix, targetPt) => {
         });
     });
 
-    return {
+    let rst = {
         row: y0,
         col: x0
     };
+    console.log(rst);
+
+    return rst;
 }
 
 getRegularGridInnerPts = (matrix, startRow, endRow) => {
     var m = matrix.length;
     var n = matrix[0].length;
-    for (let j = 1; j < n - 1; j++) {
+    for (let j = 0; j < n; j++) {
         var dirtX = (matrix[endRow][j][0] - matrix[startRow][j][0]) / (endRow - startRow);
         var dirtY = (matrix[endRow][j][1] - matrix[startRow][j][1]) / (endRow - startRow);
         for (let i = startRow + 1; i < endRow; i++) {
@@ -951,43 +949,70 @@ getRegularGridInnerPts = (matrix, startRow, endRow) => {
     }
 }
 
-divideMatrix = (matrix, loc, splitedInnerTop, splitedInnerBottom) => {
+divideMatrix = (matrix, loc, splitedInnerTopCoors, splitedInnerBottomCoors) => {
     var m = matrix.length;
     var n = matrix[0].length;
-    
+
     // 从row行 下面开始向下平移一行
     let rowN = _.cloneDeep(matrix[loc.row]);
     matrix.splice(loc.row + 1, 0, rowN);
 
-    for(let i=loc.col; i< n; i++) {
-        matrix[loc.row][i] = splitedInnerTop[i - loc.col];
-        matrix[loc.row + 1][i] = splitedInnerBottom[i - loc.col];
+    for (let i = loc.col; i < n; i++) {
+        matrix[loc.row][i] = splitedInnerTopCoors[i - loc.col];
+        matrix[loc.row + 1][i] = splitedInnerBottomCoors[i - loc.col];
     }
 
     getRegularGridInnerPts(matrix, 0, loc.row);
-    getRegularGridInnerPts(matrix, loc.row + 1, m - 1);
+    ortholize(matrix, 0, loc.row);
+    drawRegularGrid(matrix, 0, loc.row);
+
+    for(let i=0; i< loc.col; i++) {
+        matrix[loc.row + 1][i] = matrix[loc.row][i];
+    }
+
+    getRegularGridInnerPts(matrix, loc.row + 1, matrix.length - 1);
+    ortholize(matrix, loc.row + 1, matrix.length - 1);
+    drawRegularGrid(matrix, loc.row + 1, matrix.length - 1, true);
+
+    // let newMatrix = [];
+    // for(let i= loc.row + 1; i< matrix.length; i++) {
+    //     newMatrix.push(_.cloneDeep(matrix[i]));
+    // }
+    // ortholize(newMatrix, 0, newMatrix.length - 1);
+    // drawRegularGrid(newMatrix, 0, newMatrix.length - 1);
+
+    console.log(matrix);
 }
 
-drawRegularGrid = (matrix, startRow, endRow) => {
+drawRegularGrid = (matrix, startRow, endRow, drawStartRow) => {
     var multiLine = [];
 
-    let v = _
-        .chain(matrix)
-        .cloneDeep()
-        .flattenDeep()
-        .filter(v => v===undefined|| v===null ||v==='NaN')
-        .value();
-    console.log(v);
+    // let v = _
+    //     .chain(matrix)
+    //     .cloneDeep()
+    //     .flattenDeep()
+    //     .filter(v => v===undefined|| v===null ||v==='NaN')
+    //     .value();
+    // console.log(v);
 
 
     // var m = matrix.length;
     var n = matrix[0].length;
+
+    if(drawStartRow) {
+        for(let j = 0;j<n;j++) {
+            if (j !== 0) {
+                // left line
+                multiLine.push([matrix[startRow][j - 1], matrix[startRow][j]]);
+            }
+        }
+    }
+
     for (let i = startRow + 1; i < endRow; i++) {
         for (let j = 0; j < n; j++) {
             if (j !== 0) {
-                // left line
-                multiLine.push([matrix[i][j - 1], matrix[i][j]]);
-
+                    // left line
+                    multiLine.push([matrix[i][j - 1], matrix[i][j]]);
             }
             // top line
             multiLine.push([matrix[i - 1][j], matrix[i][j]]);
@@ -1001,5 +1026,40 @@ drawRegularGrid = (matrix, startRow, endRow) => {
     var feature = new ol.Feature(geometry);
     Map.gridLayer.getSource().addFeature(feature);
     return geometry;
+}
+
+ortholize = (matrix, startRow, endRow) => {
+    let rowA = _.cloneDeep(matrix[startRow]);
+    let rowZ = _.cloneDeep(matrix[endRow]);
+    let rowAO = [];
+    let rowZO = [];
+
+    let okgrid = new Module.OKGRID();
+    okgrid.initialize(endRow - startRow + 1, matrix[0].length);
+    // init pts
+    for(let i = startRow; i<= endRow; i++) {
+        let type = i===startRow||i===endRow? 0: 3;
+        for(let j=0; j< matrix[0].length; j++) {
+            let pt = matrix[i][j];
+            okgrid.setPoint(i-startRow, j, pt[0], pt[1], type);
+        }
+    }
+
+    okgrid.run(.2);
+
+    for (let i = startRow; i <= endRow; i++) {
+        for (let j = 0; j < matrix[0].length; j++) {
+            let x = okgrid.getPointX(i-startRow, j);
+            let y = okgrid.getPointY(i-startRow, j);
+            matrix[i][j] = [x, y];
+            if(i === startRow) {
+                rowAO.push([x,y])
+            }
+            if(i === endRow) {
+                rowZO.push([x,y]);
+            }
+        }
+    }
+    console.log(startRow, endRow, _.isEqual(rowA, rowAO), _.isEqual(rowZ,rowZO));
 }
 // endregion
