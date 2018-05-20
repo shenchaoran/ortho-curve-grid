@@ -117,6 +117,10 @@ Map.createMap = () => {
         })
     ]);
 
+
+    // CanvasScaleLine control
+    var scaleLineControl = new ol.control.CanvasScaleLine();
+    Map.map.addControl(scaleLineControl);
 };
 
 Map.addEditbar = () => {
@@ -212,6 +216,8 @@ Map.addEditbar = () => {
         html: '<i class="fas fa-trash"></i>',
         title: 'Clear graph',
         handleClick: () => {
+            $('.tooltip.tooltip-static').remove();
+            $('.tooltip.tooltip-measure').remove();
             _.map(Map.layers, layer => {
                 layer.getSource().clear();
             });
@@ -219,7 +225,14 @@ Map.addEditbar = () => {
     })
     editbar.addControl(clearBtn);
     Map.clearBtn = clearBtn;
+
+    Map.addLineBar(editbar);
+    Map.measureBtn = Map.addMeasure();
+    editbar.addControl(Map.measureBtn);
     // endregion
+
+    editbar.addControl(Map.addExport());
+    Map.addDelete();
 }
 
 Map.addLayerSwitch = () => {
@@ -359,13 +372,13 @@ Map.addBezierBar = () => {
     bezierBar.addControl(meshEdit);
 }
 
-Map.addLineBar = () => {
-    var lineBar = new ol.control.Bar({
-        toggleOne: true,
-        group: false,
-        className: 'polyline-bar sub-bar'
-    });
-    Map.pullRightBar.addControl(lineBar);
+Map.addLineBar = (parentBar) => {
+    // var lineBar = new ol.control.Bar({
+    //     toggleOne: true,
+    //     group: false,
+    //     className: 'polyline-bar sub-bar'
+    // });
+    // Map.pullRightBar.addControl(lineBar);
 
     // region draw polyline
     inter = new ol.interaction.Draw({
@@ -401,12 +414,12 @@ Map.addLineBar = () => {
             ]
         })
     });
-    lineBar.addControl(polylineEdit);
+    parentBar.addControl(polylineEdit);
 
-    let snap = new ol.interaction.Snap({
-        source: Map.lineLayer.getSource()
-    });
-    Map.map.addInteraction(snap);
+    // let snap = new ol.interaction.Snap({
+    //     source: Map.lineLayer.getSource()
+    // });
+    // Map.map.addInteraction(snap);
     // endregion
 
     // region draw multi polyline
@@ -448,13 +461,15 @@ Map.addLineBar = () => {
 
     // generate regular grid
     var meshEdit = new ol.control.Button({
-        html: '<i class="fab fa-connectdevelop"></i>',
+        html: '<i id="mesh-i" class="fab fa-connectdevelop"></i>',
         title: 'Mesh polyline',
         handleClick: () => {
-            meshRegularGrid();
+            $('#mesh-cfg-div').toggle();
         }
     });
-    lineBar.addControl(meshEdit);
+    parentBar.addControl(meshEdit);
+
+
 
     // var splitEdit = new ol.control.Button({
     //     html: 'split',
@@ -463,7 +478,211 @@ Map.addLineBar = () => {
     //         Map.splitLine();
     //     }
     // });
-    // lineBar.addControl(splitEdit);
+    // parentBar.addControl(splitEdit);
+
+    Map.addGridCfg();
+}
+
+Map.addMeasure = () => {
+    var measureTooltipElement;
+    var helpTooltipElement;
+    var pointerMoveHandler = function (evt) {
+        if (evt.dragging) {
+            return;
+        }
+        /** @type {string} */
+        var helpMsg = 'Click to start drawing';
+
+        if (sketch) {
+            var geom = (sketch.getGeometry());
+            if (geom instanceof ol.geom.Polygon) {
+                helpMsg = continuePolygonMsg;
+            } else if (geom instanceof ol.geom.LineString) {
+                helpMsg = continueLineMsg;
+            }
+        }
+
+        helpTooltipElement.innerHTML = helpMsg;
+        helpTooltip.setPosition(evt.coordinate);
+
+        helpTooltipElement.classList.remove('hidden');
+    };
+
+    function createMeasureTooltip() {
+        if (measureTooltipElement) {
+            measureTooltipElement.parentNode.removeChild(measureTooltipElement);
+        }
+        measureTooltipElement = document.createElement('div');
+        measureTooltipElement.className = 'tooltip tooltip-measure';
+        measureTooltip = new ol.Overlay({
+            element: measureTooltipElement,
+            offset: [0, -15],
+            positioning: 'bottom-center'
+        });
+        Map.map.addOverlay(measureTooltip);
+    }
+
+    function createHelpTooltip() {
+        if (helpTooltipElement) {
+            helpTooltipElement.parentNode.removeChild(helpTooltipElement);
+        }
+        helpTooltipElement = document.createElement('div');
+        helpTooltipElement.className = 'tooltip hidden';
+        helpTooltip = new ol.Overlay({
+            element: helpTooltipElement,
+            offset: [15, 0],
+            positioning: 'center-left'
+        });
+        Map.map.addOverlay(helpTooltip);
+    }
+    var draw = new ol.interaction.Draw({
+        source: Map.vectorLayer.getSource(),
+        type: 'LineString',
+        style: new ol.style.Style({
+            fill: new ol.style.Fill({
+                color: 'rgba(255, 255, 255, 0.2)'
+            }),
+            stroke: new ol.style.Stroke({
+                color: 'rgba(0, 0, 0, 0.5)',
+                lineDash: [10, 10],
+                width: 2
+            }),
+            image: new ol.style.Circle({
+                radius: 5,
+                stroke: new ol.style.Stroke({
+                    color: 'rgba(0, 0, 0, 0.7)'
+                }),
+                fill: new ol.style.Fill({
+                    color: 'rgba(255, 255, 255, 0.2)'
+                })
+            })
+        })
+    });
+    Map.map.getViewport().addEventListener('mouseout', function () {
+        helpTooltipElement.classList.add('hidden');
+    });
+    Map.map.addInteraction(draw);
+
+    createMeasureTooltip();
+    createHelpTooltip();
+
+    var listener;
+    draw.on('drawstart',
+        function (evt) {
+            $('.tooltip.tooltip-static').remove();
+            $('.tooltip.tooltip-measure').remove();
+            Map.vectorLayer.getSource().clear();
+
+            // set sketch
+            sketch = evt.feature;
+
+            /** @type {ol.Coordinate|undefined} */
+            var tooltipCoord = evt.coordinate;
+
+            listener = sketch.getGeometry().on('change', function (evt) {
+                var geom = evt.target;
+                var output;
+                if (geom instanceof ol.geom.LineString) {
+                    output = formatLength(geom);
+                    tooltipCoord = geom.getLastCoordinate();
+                }
+                measureTooltipElement.innerHTML = output;
+                measureTooltip.setPosition(tooltipCoord);
+            });
+        }, this
+    );
+
+    draw.on('drawend',
+        function () {
+            postal.channel('MAP')
+                .publish('measure.finished', measureTooltipElement.innerHTML);
+            measureTooltipElement.className = 'tooltip tooltip-static';
+            measureTooltip.setOffset([0, -7]);
+            // unset sketch
+            sketch = null;
+            // unset tooltip so that a new one can be created
+            measureTooltipElement = null;
+            createMeasureTooltip();
+            ol.Observable.unByKey(listener);
+        }, this
+    );
+
+
+    var measureEdit = new ol.control.Toggle({
+        html: '<i class="fas fa-ruler"></i>',
+        title: 'Measure',
+        interaction: draw
+    });
+    // Map.pullRightBar.addControl(measureEdit);
+    return measureEdit;
+}
+
+Map.addGridCfg = () => {
+    let meshBtn = $('#mesh-i').parent();
+    let meshContainer = $(meshBtn).parent();
+    $(meshContainer).append(`
+        <div id='mesh-cfg-div'>
+            <div id='before-div'>
+                <div id='width-form-item' class='form-row'>
+                    <div class='form-label'>Grid width: </div>
+                    <div class='form-control'>
+                        <input class='cfg-item' data-bind='value: width'/>
+                        <div class='ol-toggle ol-button ol-unselectable ol-control'>
+                            <button type="button" title="Measure" data-bind='click:measure.bind($root, "width")'><i class="fas fa-ruler"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div id='height-form-item' class='form-row'>
+                    <div class='form-label'>Grid height: </div>
+                    <div class='form-control'>
+                        <input class='cfg-item' data-bind='value: height'/>
+                        <div class='ol-toggle ol-button ol-unselectable ol-control'>
+                            <button type="button" title="Measure" data-bind='click:measure.bind($root, "height")'><i class="fas fa-ruler"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <button data-bind='click:submit'>Submit</button>
+            </div>
+        </div>
+    `);
+
+    function AppViewModel() {
+        let self = this;
+        postal.channel('MAP')
+            .subscribe('measure.finished', (data, en) => {
+                let btnDiv = $(`#${which}-form-item`).find('button').parent();
+                let whichInput = $(`#${which}-form-item`).find('input');
+                // console.log(data);
+                // whichInput.val(data);
+                self[which](data);
+                // btnDiv.removeClass('ol-active');
+            })
+        this.width = ko.observable();
+        this.height = ko.observable();
+        this.submit = function () {
+            meshRegularGrid(self.width(), self.height());
+            // console.log('submit');
+        };
+        this.measure = function (which) {
+            window.which = which;
+            let btnDiv = $(`#${which}-form-item`).find('button').parent();
+            let whichInput = $(`#${which}-form-item`).find('input');
+            if (btnDiv.hasClass('ol-active')) {
+                btnDiv.removeClass('ol-active');
+                Map.measureBtn.setActive(false);
+
+                $('.tooltip.tooltip-static').remove();
+                $('.tooltip.tooltip-measure').remove();
+                Map.vectorLayer.getSource().clear();
+            } else {
+                let other = which === 'width' ? 'height' : 'width';
+                $(`#${other}-form-item`).find('button').parent().removeClass('ol-active');
+                btnDiv.addClass('ol-active');
+                Map.measureBtn.setActive(true);
+            }
+        }
+    }
+    ko.applyBindings(new AppViewModel());
 }
 
 Map.splitLine = () => {
@@ -493,6 +712,48 @@ Map.splitLine = () => {
             }),
         })
     ])
+}
+
+Map.addExport = () => {
+    return exportBtn = new ol.control.Button({
+        html: '<i class="far fa-save"></i>',
+        title: 'Export points',
+        handleClick: () => {
+            let str = '';
+            _.map(Map.matrix, row => {
+                _.map(row, td => {
+                    str += `(${td[0]}, ${td[1]})\t`;
+                });
+                str += '\n';
+            })
+            let blob = new Blob([str], {
+                type: 'text/plain'
+            });
+            let url = window.URL.createObjectURL(blob);
+            var a = document.createElement("a");
+            document.body.appendChild(a);
+            a.style.display = "none";
+            a.href = url;
+            a["download"] = "points.txt";
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+    })
+}
+
+Map.addDelete = () => {
+    let selectInter = new ol.interaction.Select({
+        layers: [Map.gridLayer],
+        condition: function (mapBrowserEvent) {
+            return ol.events.condition.click(mapBrowserEvent) &&
+                ol.events.condition.altKeyOnly(mapBrowserEvent);
+        }
+    });
+    Map.map.addInteraction(selectInter);
+    selectInter.on('select', function (e) {
+        let feature = e.target.getFeatures();
+        console.log(feature);
+    });
 }
 
 // 画边界矩阵上的点
@@ -634,6 +895,8 @@ meshCurveGrid = () => {
         _.map(Map.layers, layer => {
             layer.getSource().clear();
         });
+        $('.tooltip.tooltip-static').remove();
+        $('.tooltip.tooltip-measure').remove();
     }
 }
 
@@ -753,18 +1016,33 @@ drawCurveGrid = (matrixX, matrixY) => {
 // endregion
 
 // region regular grid
-meshRegularGrid = () => {
+meshRegularGrid = (width, height) => {
+    width = parseWidth(width);
+    height = parseWidth(height);
+
     var lineSrc = Map.lineLayer.getSource();
     var features = lineSrc.getFeatures();
     // 至少画两条线，前两条为河网的边界，后两条是分叉口的边界
     if (features.length >= 2) {
         var coorsTop = features[0].getGeometry().getCoordinates();
         var coorsBottom = features[1].getGeometry().getCoordinates();
+        var lineTop = turf.lineString(coorsTop);
+        var lineBottom = turf.lineString(coorsBottom);
+        var lengthY = formatLength(new ol.geom.LineString([coorsTop[0], coorsBottom[0]]));
+        lengthY = parseWidth(lengthY);
+        var lengthTop = formatLength(features[0].getGeometry());
+        lengthTop = parseWidth(lengthTop);
+        var lengthBottom = formatLength(features[1].getGeometry());
+        lengthBottom = parseWidth(lengthBottom);
+        X_NUM = parseInt((lengthTop + lengthBottom) / 2 / width);
+        Y_NUM = parseInt(lengthY / height);
+
         var splitedTopCoors = splitLineString(features[0].getGeometry(), X_NUM);
         var splitedBottomCoors = splitLineString(features[1].getGeometry(), X_NUM);
 
         let mxL = _.min([splitedTopCoors.length, splitedBottomCoors.length]) - 1;
-        var matrix = new Array(Y_NUM + 1);
+        let matrix = new Array(Y_NUM + 1);
+        Map.matrix = matrix;
         _.map(matrix, (row, i) => {
             matrix[i] = new Array(mxL);
             _.fill(matrix[i], ['0', '0']);
@@ -899,6 +1177,8 @@ meshRegularGrid = () => {
         alert('线段数量不符合要求，请输入2条或4条线段！');
         _.map(Map.layers, layer => {
             layer.getSource().clear();
+            $('.tooltip.tooltip-static').remove();
+            $('.tooltip.tooltip-measure').remove();
         });
     }
 }
@@ -966,7 +1246,7 @@ divideMatrix = (matrix, loc, splitedInnerTopCoors, splitedInnerBottomCoors) => {
     ortholize(matrix, 0, loc.row);
     drawRegularGrid(matrix, 0, loc.row);
 
-    for(let i=0; i< loc.col; i++) {
+    for (let i = 0; i < loc.col; i++) {
         matrix[loc.row + 1][i] = matrix[loc.row][i];
     }
 
@@ -999,8 +1279,8 @@ drawRegularGrid = (matrix, startRow, endRow, drawStartRow) => {
     // var m = matrix.length;
     var n = matrix[0].length;
 
-    if(drawStartRow) {
-        for(let j = 0;j<n;j++) {
+    if (drawStartRow) {
+        for (let j = 0; j < n; j++) {
             if (j !== 0) {
                 // left line
                 multiLine.push([matrix[startRow][j - 1], matrix[startRow][j]]);
@@ -1011,8 +1291,8 @@ drawRegularGrid = (matrix, startRow, endRow, drawStartRow) => {
     for (let i = startRow + 1; i < endRow; i++) {
         for (let j = 0; j < n; j++) {
             if (j !== 0) {
-                    // left line
-                    multiLine.push([matrix[i][j - 1], matrix[i][j]]);
+                // left line
+                multiLine.push([matrix[i][j - 1], matrix[i][j]]);
             }
             // top line
             multiLine.push([matrix[i - 1][j], matrix[i][j]]);
@@ -1037,29 +1317,51 @@ ortholize = (matrix, startRow, endRow) => {
     let okgrid = new Module.OKGRID();
     okgrid.initialize(endRow - startRow + 1, matrix[0].length);
     // init pts
-    for(let i = startRow; i<= endRow; i++) {
-        let type = i===startRow||i===endRow? 0: 3;
-        for(let j=0; j< matrix[0].length; j++) {
+    for (let i = startRow; i <= endRow; i++) {
+        let type = i === startRow || i === endRow ? 0 : 3;
+        for (let j = 0; j < matrix[0].length; j++) {
             let pt = matrix[i][j];
-            okgrid.setPoint(i-startRow, j, pt[0], pt[1], type);
+            okgrid.setPoint(i - startRow, j, pt[0], pt[1], type);
         }
     }
 
-    okgrid.run(.2);
+    okgrid.run(2);
 
     for (let i = startRow; i <= endRow; i++) {
         for (let j = 0; j < matrix[0].length; j++) {
-            let x = okgrid.getPointX(i-startRow, j);
-            let y = okgrid.getPointY(i-startRow, j);
+            let x = okgrid.getPointX(i - startRow, j);
+            let y = okgrid.getPointY(i - startRow, j);
             matrix[i][j] = [x, y];
-            if(i === startRow) {
-                rowAO.push([x,y])
+            if (i === startRow) {
+                rowAO.push([x, y])
             }
-            if(i === endRow) {
-                rowZO.push([x,y]);
+            if (i === endRow) {
+                rowZO.push([x, y]);
             }
         }
     }
-    console.log(startRow, endRow, _.isEqual(rowA, rowAO), _.isEqual(rowZ,rowZO));
+    console.log(startRow, endRow, _.isEqual(rowA, rowAO), _.isEqual(rowZ, rowZO));
 }
 // endregion
+
+formatLength = function (line) {
+    var length = ol.Sphere.getLength(line);
+    var output;
+    if (length > 100) {
+        output = (Math.round(length / 1000 * 100) / 100) +
+            ' ' + 'km';
+    } else {
+        output = (Math.round(length * 100) / 100) +
+            ' ' + 'm';
+    }
+    return output;
+};
+
+parseWidth = function (width) {
+    if (width.indexOf('km') !== -1) {
+        width = parseFloat(width);
+    } else if (width.indexOf('m') !== -1) {
+        width = parseFloat(width) / 1000;
+    }
+    return width;
+}

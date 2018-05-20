@@ -8,5 +8,5 @@ $(document).ready(() => {
     // Map.drawTestGrid();
 
     // Map.addBezierBar();
-    Map.addLineBar();
+    // Map.addLineBar();
 });

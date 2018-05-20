@@ -119,3 +119,66 @@ body,
 .ol-overlay img {
     max-width: 90%;
 }
+
+#mesh-cfg-div {
+    display: none;
+    position: absolute;
+    right: -15px;
+    top: 50px;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+#before-div {
+    position: relative;
+    margin: 10px;
+    width: 250px;
+}
+
+#before-div:before {
+    content: '';
+    display: inline-block;
+    border-width: 8px;
+    border-color: transparent transparent rgba(255, 255, 255, 0.5);
+    border-style: solid;
+    position: absolute;
+    right: 10px;
+    top: -26px;
+}
+
+.cfg-item {
+    /* margin: 0 10px; */
+    width: 100px;
+}
+
+.form-row>div {
+    display: inline;
+}
+
+.form-row {
+    display: flex;
+    flex-flow: row nowrap;
+    justify-content: space-between;
+}
+
+#before-div>button{
+    width: auto;
+    padding: 0 5px;
+    margin-top: 10px;
+    cursor: pointer;
+}
+
+.ol-control>button {
+    cursor: pointer;
+}
+
+.form-control {
+    display: flex !important;
+    /* flex-flow: row nowrap; */
+}
+
+.form-control>input {
+    display: inline;
+}
+.form-control>button {
+    display: inline;
+}

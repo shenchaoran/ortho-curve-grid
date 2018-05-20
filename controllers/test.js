@@ -12,11 +12,15 @@ var ChildProcess = require('./child-process.controller');
 
 var fPath1 = path.join(__dirname, '../matlab/mx_result.csv');
 fs.stat(fPath1, (err, stats) => {
-        if (err) {
-            console.log(err);
-        }
-        console.log(stats);
-    })
-    // .then(stats => {
-    //     console.log(stats);
-    // })
+    if (err) {
+        console.log(err);
+    }
+    console.log(stats);
+})
+// .then(stats => {
+//     console.log(stats);
+// })
+
+child_process.exec(cmd, {
+    cwd: path.join(__dirname, '../matlab')
+}, (err, stdout, stderr) => {})
