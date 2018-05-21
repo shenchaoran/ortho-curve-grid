@@ -130,6 +130,7 @@ Map.addEditbar = () => {
         group: false,
         className: 'edit-bar sub-bar'
     });
+    Map.editbar = editbar;
     Map.pullRightBar.addControl(editbar);
 
     let inter = new ol.interaction.Draw({
@@ -232,7 +233,16 @@ Map.addEditbar = () => {
     // endregion
 
     editbar.addControl(Map.addExport());
-    Map.addDelete();
+
+    
+    var t = new ol.control.Toggle({
+        html: '<i class="fas fa-eraser" ></i>',
+        title: "Delete line",
+        onToggle: function (e) {
+            window.allowDelete = e;
+        }
+    });
+    Map.editbar.addControl(t);
 }
 
 Map.addLayerSwitch = () => {
@@ -416,10 +426,10 @@ Map.addLineBar = (parentBar) => {
     });
     parentBar.addControl(polylineEdit);
 
-    // let snap = new ol.interaction.Snap({
-    //     source: Map.lineLayer.getSource()
-    // });
-    // Map.map.addInteraction(snap);
+    let snap = new ol.interaction.Snap({
+        source: Map.lineLayer.getSource()
+    });
+    Map.map.addInteraction(snap);
     // endregion
 
     // region draw multi polyline
@@ -742,17 +752,66 @@ Map.addExport = () => {
 }
 
 Map.addDelete = () => {
+
+    let aidLayer = new ol.layer.Vector({
+        title: 'Aid layer',
+        source: new ol.source.Vector({
+            features: _.map(Map.multiLine, (obj) => {
+                return new ol.Feature({
+                    geometry: new ol.geom.LineString(obj.line),
+                    id: obj.start[0] + '-' + obj.start[1] + '-' + obj.end[0] + '-' + obj.end[1]
+                });
+            })
+        })
+    });
+    aidLayer.setStyle([
+        new ol.style.Style({
+            stroke: new ol.style.Stroke({
+                color: 'rgba(255,255,0,0.1)',
+                width: 1
+            }),
+        })
+    ]);
+    Map.map.addLayer(aidLayer);
+    Map.aidLayer = aidLayer;
+
     let selectInter = new ol.interaction.Select({
-        layers: [Map.gridLayer],
+        layers: [Map.aidLayer],
         condition: function (mapBrowserEvent) {
-            return ol.events.condition.click(mapBrowserEvent) &&
-                ol.events.condition.altKeyOnly(mapBrowserEvent);
+            return ol.events.condition.click(mapBrowserEvent) 
+            && window.allowDelete;
         }
     });
     Map.map.addInteraction(selectInter);
     selectInter.on('select', function (e) {
-        let feature = e.target.getFeatures();
-        console.log(feature);
+        e.target.getFeatures().getArray().every(feature => {
+            let coors = feature.getGeometry().getCoordinates();
+            let id = feature.get('id');
+            let group = id.split(/-/g);
+            group = _.map(group, v => {
+                let temp = parseInt(v);
+                if(temp === NaN) {
+                    console.log(id);
+                }
+                return temp;
+            });
+
+            Map.aidLayer.getSource().removeFeature(feature);
+
+            Map.gridLayer.getSource().clear();
+            if(!Map.ignoreLines) {
+                Map.ignoreLines = [];
+            }
+            Map.ignoreLines.push({
+                start: [group[0], group[1]],
+                end: [group[2], group[3]]
+            });
+            _.map(Map.divideCfg, cfg => {
+                drawRegularGrid(Map.matrix, cfg.start, cfg.end, cfg.drawStartRow);
+            });
+
+        });
+        selectInter.getFeatures().clear();
     });
 }
 
@@ -1084,6 +1143,9 @@ meshRegularGrid = (width, height) => {
             drawRegularGrid(matrix, 0, matrix.length - 1);
         }
 
+        // ...
+        Map.addDelete();
+
         var matrixX = [];
         var matrixY = [];
         _.map(matrix, (row, i) => {
@@ -1116,7 +1178,8 @@ meshRegularGrid = (width, height) => {
         // addModify
         var layer = Map.gridLayer;
         var modify = new ol.interaction.Modify({
-            source: layer.getSource()
+            source: layer.getSource(),
+            // insertVertexCondition: true
         });
         let movingPt;
         modify.on('modifystart', e => {
@@ -1212,7 +1275,7 @@ getNearistPt = (matrix, targetPt) => {
         row: y0,
         col: x0
     };
-    console.log(rst);
+    // console.log(rst);
 
     return rst;
 }
@@ -1254,6 +1317,7 @@ divideMatrix = (matrix, loc, splitedInnerTopCoors, splitedInnerBottomCoors) => {
     ortholize(matrix, loc.row + 1, matrix.length - 1);
     drawRegularGrid(matrix, loc.row + 1, matrix.length - 1, true);
 
+    
     // let newMatrix = [];
     // for(let i= loc.row + 1; i< matrix.length; i++) {
     //     newMatrix.push(_.cloneDeep(matrix[i]));
@@ -1261,10 +1325,23 @@ divideMatrix = (matrix, loc, splitedInnerTopCoors, splitedInnerBottomCoors) => {
     // ortholize(newMatrix, 0, newMatrix.length - 1);
     // drawRegularGrid(newMatrix, 0, newMatrix.length - 1);
 
-    console.log(matrix);
+    // console.log(matrix);
 }
 
 drawRegularGrid = (matrix, startRow, endRow, drawStartRow) => {
+    if(!Map.divideCfg) {
+        Map.divideCfg = [];
+    }
+    let cfg ={
+        start: startRow,
+        end: endRow,
+        drawStartRow: drawStartRow
+    };
+    if(!_.find(Map.divideCfg, cfg)){
+        Map.divideCfg.push(cfg);
+    }
+    
+
     var multiLine = [];
 
     // let v = _
@@ -1278,12 +1355,29 @@ drawRegularGrid = (matrix, startRow, endRow, drawStartRow) => {
 
     // var m = matrix.length;
     var n = matrix[0].length;
+    let addLine = (start, end) => {
+        let ignore = false;
+        _.map(Map.ignoreLines, ignoreLine => {
+            if(
+                _.isEqual(ignoreLine.start, start) && _.isEqual(ignoreLine.end, end) ||
+                _.isEqual(ignoreLine.end, start) && _.isEqual(ignoreLine.start, end) 
+             ) {
+                ignore = true;
+            }
+        });
 
+        multiLine.push({
+            line: [matrix[start[0]][start[1]], matrix[end[0]][end[1]]],
+            start: start,
+            end: end,
+            ignore: ignore
+        });
+    }
     if (drawStartRow) {
         for (let j = 0; j < n; j++) {
             if (j !== 0) {
                 // left line
-                multiLine.push([matrix[startRow][j - 1], matrix[startRow][j]]);
+                addLine([startRow, j - 1], [startRow, j]);
             }
         }
     }
@@ -1292,19 +1386,24 @@ drawRegularGrid = (matrix, startRow, endRow, drawStartRow) => {
         for (let j = 0; j < n; j++) {
             if (j !== 0) {
                 // left line
-                multiLine.push([matrix[i][j - 1], matrix[i][j]]);
+                addLine([i, j - 1], [i, j]);
             }
             // top line
-            multiLine.push([matrix[i - 1][j], matrix[i][j]]);
+            addLine([i - 1, j], [i, j]);
             if (i == endRow - 1) {
                 // bottom line
-                multiLine.push([matrix[i][j], matrix[i + 1][j]])
+                addLine([i, j], [i + 1, j])
             }
         }
     }
-    var geometry = new ol.geom.MultiLineString(multiLine);
+    let temp = _.chain(multiLine)
+        .filter(v => !v.ignore)
+        .map(obj => obj.line)
+        .value();
+    var geometry = new ol.geom.MultiLineString(temp);
     var feature = new ol.Feature(geometry);
     Map.gridLayer.getSource().addFeature(feature);
+    Map.multiLine = multiLine;
     return geometry;
 }
 
@@ -1340,7 +1439,7 @@ ortholize = (matrix, startRow, endRow) => {
             }
         }
     }
-    console.log(startRow, endRow, _.isEqual(rowA, rowAO), _.isEqual(rowZ, rowZO));
+    // console.log(startRow, endRow, _.isEqual(rowA, rowAO), _.isEqual(rowZ, rowZO));
 }
 // endregion
 
