@@ -1424,7 +1424,7 @@ ortholize = (matrix, startRow, endRow) => {
         }
     }
 
-    okgrid.run(2);
+    okgrid.run(100);
 
     for (let i = startRow; i <= endRow; i++) {
         for (let j = 0; j < matrix[0].length; j++) {
